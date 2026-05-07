@@ -284,43 +284,86 @@ SETUP_LANG=zh ./build.sh
 
 ## Architecture
 
-### Docker Build Stage Diagram
-
-```mermaid
-graph TD
-    EXT1["bats/bats:latest"]
-    EXT2["alpine:latest"]
-    EXT3["osrf/ros:humble-desktop-full-jammy"]
-
-    EXT1 --> bats-src["bats-src"]
-    EXT2 --> bats-ext["bats-extensions"]
-
-    EXT3 --> sys["sys\nuser/group・locale・timezone"]
-
-    sys --> base["base\nsudo・git・vim・tmux・terminator・python3・colcon..."]
-    base --> devel["devel\nshell config"]
-
-    bats-src --> test["test  ⚡ ephemeral\nsmoke tests, discarded after build"]
-    bats-ext --> test
-    devel --> test
-
-    sys --> runtime-base["runtime-base\nsudo・tini"]
-    runtime-base --> runtime["runtime\n+ required ROS 2 packages"]
+### Multi-stage build flow
 
 ```
+                     BASE_IMAGE  (osrf/ros:* or ros:* — chosen via ARG)
+                          │
+                          ▼
+                         sys  ───────────────────────┐
+                          │                          │
+                          ▼                          ▼
+                         base                   runtime-base
+                          │                          │
+                          ▼                          ▼
+                       devel  ─┐                  runtime  ◄────── COPY --from=build
+                          │    │                                    /opt/ros/install/
+                          ▼    │
+        TEST_TOOLS ──►  test   └──► build  ─── compile your packages here,
+        (external)              (downstream      output → /opt/ros/install/
+                                 contract slot)
+```
 
-### Stage Description
+| Stage | Built FROM | Purpose | When |
+|---|---|---|---|
+| `sys` | `${BASE_IMAGE}` | OS base + user/group + locale + timezone + APT mirror (handles both legacy `sources.list` and noble's `ubuntu.sources` deb822) | Always |
+| `base` | `sys` | Common dev tools (sudo / git / vim / tmux / terminator / python3 / colcon-common-extensions / rosdep / vcstool) | Always |
+| `devel` | `base` | Full dev environment + plotjuggler + entrypoint + X11 forward | `./build.sh` default |
+| `test` | `devel` + `${TEST_TOOLS_IMAGE}` | ShellCheck + Hadolint + Bats; ephemeral | `./build.sh test` (CI gate) |
+| `build` | `devel` | **Downstream contract slot** — compile your code, output to `/opt/ros/install/` | Override in your fork |
+| `runtime-base` | `sys` | Minimal runtime: sudo + tini | Always |
+| `runtime` | `runtime-base` + `COPY --from=build` | Production image with binaries from `build` stage | `./build.sh runtime` |
 
-| Stage | FROM | Purpose |
-|-------|------|---------|
-| `bats-src` | `bats/bats:latest` | Bats binary source, not shipped |
-| `bats-extensions` | `alpine:latest` | bats-support, bats-assert, not shipped |
-| `sys` | `osrf/ros:humble-desktop-full-jammy` | OS base: user/group, locale, timezone |
-| `base` | `sys` | Common dev tools + colcon + ros2cli (apt) |
-| `devel` | `base` | Full dev environment with shell config |
-| `test` | `devel` | Injects bats, runs smoke/, discarded after build |
-| `runtime-base` | `sys` | Minimal runtime base, no dev tools |
-| `runtime` | `runtime-base` | Adds required ROS 2 packages |
+### Downstream pattern: from devel to a release runtime
+
+`ros2_distro` itself ships an empty `build` stage so the upstream image
+builds cleanly (no `src/` required). Your downstream fork overrides that
+stage to compile actual packages:
+
+```dockerfile
+# Your repo's Dockerfile (e.g. urg_node, realsense), inheriting from
+# ros2_distro's layer cake. Insert this BETWEEN the inherited `devel`
+# and `runtime` stages by re-declaring `FROM devel AS build` with content:
+
+FROM devel AS build
+
+ARG USER
+ARG GROUP
+
+USER root
+COPY --chown=${USER}:${GROUP} src/ /home/${USER}/work/src/
+
+# Resolve ROS 2 deps (rosdep) + compile (colcon).
+RUN apt-get update && \
+    rosdep install --from-paths /home/${USER}/work/src -y --ignore-src && \
+    rm -rf /var/lib/apt/lists/*
+USER ${USER}
+
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    cd /home/${USER}/work && \
+    colcon build --install-base /opt/ros/install \
+                 --merge-install \
+                 --cmake-args -DCMAKE_BUILD_TYPE=Release
+```
+
+`runtime` then receives the install tree via the unchanged
+`COPY --from=build /opt/ros/install/ /opt/ros/install/` line and your
+production image only contains binaries — no `src/`, no `build/`, no
+`.colcon-build` workspace state.
+
+### CI build matrix
+
+The CI workflow validates 4 BASE_IMAGE combinations on every push:
+
+| # | BASE_IMAGE | Why |
+|---|---|---|
+| 1 | `osrf/ros:humble-desktop-full-jammy` | default; full GUI + Gazebo Classic |
+| 2 | `ros:humble-ros-base-jammy` | cross-registry; verifies smoke tests skip GUI cleanly |
+| 3 | `osrf/ros:jazzy-desktop-full-noble` | jazzy on noble (deb822 apt sources, Gazebo Harmonic `gz`) |
+| 4 | `ros:jazzy-ros-base-noble` | jazzy + cross-registry |
+
+`ros-core` and ROS 2 Iron (EOL) are intentionally not in the matrix; see
+the project README for rationale.
 
 ## Smoke Tests
 

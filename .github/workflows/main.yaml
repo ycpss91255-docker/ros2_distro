@@ -16,13 +16,37 @@ jobs:
   call-docker-build:
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # default
+          - { name: 'humble-desktop-full', base: 'osrf/ros:humble-desktop-full-jammy' }
+          - { name: 'humble-ros-base',     base: 'ros:humble-ros-base-jammy' }
+          - { name: 'jazzy-desktop-full',  base: 'osrf/ros:jazzy-desktop-full-noble' }
+          - { name: 'jazzy-ros-base',      base: 'ros:jazzy-ros-base-noble' }
+    name: build (${{ matrix.target.name }})
     uses: ycpss91255-docker/template/.github/workflows/build-worker.yaml@v0.19.0
     with:
-      image_name: osrf_ros2_humble
+      image_name: ros2_distro
       build_args: |
-        ROS_DISTRO=humble
-        ROS_TAG=desktop-full
-        UBUNTU_CODENAME=jammy
+        BASE_IMAGE=${{ matrix.target.base }}
+
+  # Stable-named aggregator so branch protection's required-status-check
+  # doesn't have to enumerate every matrix entry. Branch protection
+  # references `ci-passed`; matrix shape can change without re-configuring
+  # protection.
+  ci-passed:
+    needs: call-docker-build
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }}
+    steps:
+      - run: |
+          if [ "${{ needs.call-docker-build.result }}" != "success" ]; then
+            echo "One or more matrix builds failed (result=${{ needs.call-docker-build.result }})"
+            exit 1
+          fi
+          echo "All matrix builds passed"
 
   call-release:
     needs: call-docker-build
@@ -31,5 +55,5 @@ jobs:
       contents: write
     uses: ycpss91255-docker/template/.github/workflows/release-worker.yaml@v0.19.0
     with:
-      archive_name_prefix: osrf_ros2_humble
+      archive_name_prefix: ros2_distro
     secrets: inherit

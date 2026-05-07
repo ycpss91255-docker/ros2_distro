@@ -26,4 +26,17 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Uses the `TEST_TOOLS_IMAGE` Dockerfile pattern from template v0.18.0+
   (no inline `bats-src` / `bats-extensions` / `lint-tools` stages); the
   saving versus the legacy two-repo split is roughly -50 lines net.
+- **`build` stage between `devel` and `runtime`**: contract slot for
+  downstream consumers to compile their packages. Empty no-op upstream
+  (just `mkdir /opt/ros/install`); downstream forks override
+  `FROM devel AS build` with `colcon build --install-base /opt/ros/install
+  --merge-install` (or equivalent). `runtime` `COPY --from=build
+  /opt/ros/install/` so the production image contains only binaries,
+  no `src/` / `build/` / `.colcon-build` artifacts. README's Architecture
+  section documents the full layer cake.
+- **CI build matrix (4 entries / push)**: `humble-desktop-full` (osrf,
+  default), `humble-ros-base` (ros:, cross-registry), `jazzy-desktop-full`
+  (osrf, validates noble's deb822 apt format and Gazebo Harmonic `gz`),
+  `jazzy-ros-base` (ros:). `ros-core` and Iron (EOL) intentionally
+  excluded; see project README for rationale.
 - Template subtree pinned at v0.19.0.
