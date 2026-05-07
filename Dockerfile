@@ -50,10 +50,10 @@ ENV NVIDIA_DRIVER_CAPABILITIES="all"
 SHELL ["/bin/bash", "-x", "-euo", "pipefail", "-c"]
 
 # Sanity-check ROS_DISTRO inherited from BASE_IMAGE.
-RUN [ -n "${ROS_DISTRO:-}" ] && [ -d "/opt/ros/${ROS_DISTRO}" ] || { \
+RUN if [ -z "${ROS_DISTRO:-}" ] || [ ! -d "/opt/ros/${ROS_DISTRO}" ]; then \
         echo "FATAL: ROS_DISTRO unset or /opt/ros/${ROS_DISTRO:-?} missing -- is BASE_IMAGE a ros: / osrf/ros: image?" >&2; \
         exit 1; \
-    }
+    fi
 
 # Setup users and groups
 RUN if getent group "${GID}" >/dev/null; then \
@@ -129,9 +129,12 @@ RUN apt-get update && \
         python3-colcon-common-extensions \
         python3-rosdep \
         python3-vcstool \
-        # GPU/OpenGL (Intel + software fallback; harmless on headless variants)
+        # GPU/OpenGL (Intel + software fallback; harmless on headless variants).
+        # `libgl1-mesa-glx` was removed in Ubuntu 24.04 noble; `libgl1` exists
+        # on every supported Ubuntu (jammy / noble) so the multi-distro build
+        # path stays compatible across humble (jammy) and jazzy (noble).
         libgl1-mesa-dri \
-        libgl1-mesa-glx \
+        libgl1 \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -161,8 +164,6 @@ COPY --chmod=0755 "./${ENTRYPOINT_FILE}" "/entrypoint.sh"
 COPY --chown="${USER}":"${GROUP}" --chmod=0755 "${CONFIG_SRC}" "${CONFIG_DIR}"
 
 USER "${USER}"
-
-RUN "${CONFIG_DIR}"/pip/setup.sh
 
 # Setup shell, terminator, tmux
 RUN cat "${CONFIG_DIR}"/shell/bashrc >> "${HOME}/.bashrc" && \
