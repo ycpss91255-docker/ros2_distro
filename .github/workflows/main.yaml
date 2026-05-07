@@ -32,6 +32,22 @@ jobs:
       build_args: |
         BASE_IMAGE=${{ matrix.target.base }}
 
+  # Stable-named aggregator so branch protection's required-status-check
+  # doesn't have to enumerate every matrix entry. Branch protection
+  # references `ci-passed`; matrix shape can change without re-configuring
+  # protection.
+  ci-passed:
+    needs: call-docker-build
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }}
+    steps:
+      - run: |
+          if [ "${{ needs.call-docker-build.result }}" != "success" ]; then
+            echo "One or more matrix builds failed (result=${{ needs.call-docker-build.result }})"
+            exit 1
+          fi
+          echo "All matrix builds passed"
+
   call-release:
     needs: call-docker-build
     if: startsWith(github.ref, 'refs/tags/')
