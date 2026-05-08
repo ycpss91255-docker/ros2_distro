@@ -7,6 +7,30 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`call-publish` job in `main.yaml`**: opts into template v0.20.0's
+  new `publish-worker.yaml` reusable workflow (template#232 / template#233).
+  On tag push, each of the 4 matrix variants publishes a Docker image
+  to `ghcr.io/ycpss91255-docker/ros2_distro:<tag>-<entry-name>`, and the
+  default variant (`humble-desktop-full`) additionally publishes
+  `:latest-humble-desktop-full`. Auth via GITHUB_TOKEN (no extra
+  secrets); `target: devel`.
+
+  **Consumption pattern: CI build cache only.** These published images
+  are NOT intended as a Docker `FROM` base for downstream app repos.
+  Future app-pair consolidations (urg_node / realsense / sick) keep
+  their own self-contained Dockerfile that `FROM`s upstream
+  `osrf/ros:` / `ros:` directly; their CI may pass
+  `cache-from: type=registry,ref=ghcr.io/.../ros2_distro:<tag>-<variant>`
+  to BuildKit as a best-effort hint to skip the cached sys/base/devel
+  layers. When GHCR is unreachable (air-gapped, firewalled networks),
+  app builds fall through to the full upstream rebuild without
+  failing -- no hard dependency on GHCR.
+
+### Changed
+- Template subtree upgraded to `v0.20.0` (was `v0.19.0`).
+  `main.yaml` reusable-workflow `@tag` references bumped accordingly.
+
 ## [v0.1.0] - 2026-05-07
 
 ### Added

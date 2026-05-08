@@ -26,7 +26,7 @@ jobs:
           - { name: 'jazzy-desktop-full',  base: 'osrf/ros:jazzy-desktop-full-noble' }
           - { name: 'jazzy-ros-base',      base: 'ros:jazzy-ros-base-noble' }
     name: build (${{ matrix.target.name }})
-    uses: ycpss91255-docker/template/.github/workflows/build-worker.yaml@v0.19.0
+    uses: ycpss91255-docker/template/.github/workflows/build-worker.yaml@v0.20.0
     with:
       image_name: ros2_distro
       build_args: |
@@ -48,12 +48,50 @@ jobs:
           fi
           echo "All matrix builds passed"
 
+  # Publish per-variant Docker images to GHCR on tag push. Opt-in via
+  # template's publish-worker.yaml (template v0.20.0+). Each matrix entry
+  # publishes ghcr.io/ycpss91255-docker/ros2_distro:${tag}-${entry-name};
+  # the `is_latest: true` entry also publishes :latest-<entry-name>.
+  #
+  # Intent: CI build cache only. Downstream app repos (urg_node /
+  # realsense / sick when consolidated) STILL `FROM` upstream
+  # `osrf/ros:` / `ros:` directly, not these images. App CI may pass
+  # `cache-from: type=registry,ref=ghcr.io/.../ros2_distro:<tag>-<variant>`
+  # to BuildKit as a best-effort cache hint -- if GHCR is reachable
+  # the build skips the cached sys/base/devel layers; if not, builds
+  # fall through to the full upstream rebuild without failing. This
+  # keeps app repos self-contained (no hard dependency on GHCR being
+  # reachable; works in air-gapped / firewalled networks).
+  call-publish:
+    needs: ci-passed
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: 'humble-desktop-full', base: 'osrf/ros:humble-desktop-full-jammy', is_latest: true }
+          - { name: 'humble-ros-base',     base: 'ros:humble-ros-base-jammy',          is_latest: false }
+          - { name: 'jazzy-desktop-full',  base: 'osrf/ros:jazzy-desktop-full-noble',  is_latest: false }
+          - { name: 'jazzy-ros-base',      base: 'ros:jazzy-ros-base-noble',           is_latest: false }
+    name: publish (${{ matrix.target.name }})
+    uses: ycpss91255-docker/template/.github/workflows/publish-worker.yaml@v0.20.0
+    with:
+      image_name: ros2_distro
+      tag_suffix: "-${{ matrix.target.name }}"
+      is_latest: ${{ matrix.target.is_latest }}
+      target: devel
+      build_args: |
+        BASE_IMAGE=${{ matrix.target.base }}
+
   call-release:
     needs: call-docker-build
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
-    uses: ycpss91255-docker/template/.github/workflows/release-worker.yaml@v0.19.0
+    uses: ycpss91255-docker/template/.github/workflows/release-worker.yaml@v0.20.0
     with:
       archive_name_prefix: ros2_distro
     secrets: inherit
