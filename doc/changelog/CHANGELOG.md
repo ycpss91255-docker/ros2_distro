@@ -8,6 +8,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `LICENSE` (Apache 2.0) and CI / License badges in
+  `README.md` + 3 translated READMEs (#6). Fresh add
+  -- repo previously had no LICENSE and no badges. Aligns with
+  the org-wide Apache 2.0 migration tracked across 17 sister
+  repos.
+
+### Added
 - **`call-publish` job in `main.yaml`**: opts into template v0.20.0's
   new `publish-worker.yaml` reusable workflow (template#232 / template#233).
   On tag push, each of the 4 matrix variants publishes a Docker image
