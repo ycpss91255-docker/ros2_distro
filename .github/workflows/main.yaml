@@ -52,8 +52,16 @@ jobs:
   # template's publish-worker.yaml (template v0.20.0+). Each matrix entry
   # publishes ghcr.io/ycpss91255-docker/ros2_distro:${tag}-${entry-name};
   # the `is_latest: true` entry also publishes :latest-<entry-name>.
-  # Downstream app repos (urg_node, realsense, sick when consolidated)
-  # FROM these images instead of duplicating sys/base/devel layers.
+  #
+  # Intent: CI build cache only. Downstream app repos (urg_node /
+  # realsense / sick when consolidated) STILL `FROM` upstream
+  # `osrf/ros:` / `ros:` directly, not these images. App CI may pass
+  # `cache-from: type=registry,ref=ghcr.io/.../ros2_distro:<tag>-<variant>`
+  # to BuildKit as a best-effort cache hint -- if GHCR is reachable
+  # the build skips the cached sys/base/devel layers; if not, builds
+  # fall through to the full upstream rebuild without failing. This
+  # keeps app repos self-contained (no hard dependency on GHCR being
+  # reachable; works in air-gapped / firewalled networks).
   call-publish:
     needs: ci-passed
     if: startsWith(github.ref, 'refs/tags/')
