@@ -1,5 +1,7 @@
 # ros2_distro -- ROS 2 Multi-distro Docker Environment
 
+[![CI](https://github.com/ycpss91255-docker/ros2_distro/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/ros2_distro/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](./LICENSE)
+
 [![CI](https://github.com/ycpss91255-docker/ros2_distro/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/ros2_distro/actions/workflows/main.yaml)
 
 One-command ROS 2 containerized dev environment. Single Dockerfile, single `BASE_IMAGE` ARG to switch between Humble / Jazzy / Iron and `ros:` (headless) / `osrf/ros:` (desktop / desktop-full) at build time.
