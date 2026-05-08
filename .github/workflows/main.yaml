@@ -48,6 +48,36 @@ jobs:
           fi
           echo "All matrix builds passed"
 
+  # Publish per-variant Docker images to GHCR on tag push. Opt-in via
+  # template's publish-worker.yaml (template v0.20.0+). Each matrix entry
+  # publishes ghcr.io/ycpss91255-docker/ros2_distro:${tag}-${entry-name};
+  # the `is_latest: true` entry also publishes :latest-<entry-name>.
+  # Downstream app repos (urg_node, realsense, sick when consolidated)
+  # FROM these images instead of duplicating sys/base/devel layers.
+  call-publish:
+    needs: ci-passed
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: 'humble-desktop-full', base: 'osrf/ros:humble-desktop-full-jammy', is_latest: true }
+          - { name: 'humble-ros-base',     base: 'ros:humble-ros-base-jammy',          is_latest: false }
+          - { name: 'jazzy-desktop-full',  base: 'osrf/ros:jazzy-desktop-full-noble',  is_latest: false }
+          - { name: 'jazzy-ros-base',      base: 'ros:jazzy-ros-base-noble',           is_latest: false }
+    name: publish (${{ matrix.target.name }})
+    uses: ycpss91255-docker/template/.github/workflows/publish-worker.yaml@v0.20.0
+    with:
+      image_name: ros2_distro
+      tag_suffix: "-${{ matrix.target.name }}"
+      is_latest: ${{ matrix.target.is_latest }}
+      target: devel
+      build_args: |
+        BASE_IMAGE=${{ matrix.target.base }}
+
   call-release:
     needs: call-docker-build
     if: startsWith(github.ref, 'refs/tags/')
