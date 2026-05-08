@@ -100,8 +100,8 @@ RUN sed -i "s@archive.ubuntu.com@${APT_MIRROR_UBUNTU}@g" /etc/apt/sources.list |
     update-locale LANG="${LANG}" && \
     ln -snf /usr/share/zoneinfo/"${TZ}" /etc/localtime && echo "${TZ}" > /etc/timezone
 
-############################## base ##############################
-FROM sys AS base
+############################## devel-base ##############################
+FROM sys AS devel-base
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -140,7 +140,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ############################## devel ##############################
-FROM base AS devel
+FROM devel-base AS devel
 
 ARG USER
 ARG GROUP
@@ -179,11 +179,11 @@ EXPOSE 22
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
 
-############################## test (ephemeral) ##############################
+############################## devel-test (ephemeral) ##############################
 # Resolves to test-tools:local (local build.sh) or ghcr.io/.../test-tools:vX.Y.Z (CI).
 FROM ${TEST_TOOLS_IMAGE} AS test-tools-stage
 
-FROM devel AS test
+FROM devel AS devel-test
 
 USER root
 
@@ -289,3 +289,17 @@ EXPOSE 22
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
+
+############################## runtime-test (ephemeral) ##############################
+# Install-check smoke for the runtime image (template v0.21.1+ #243).
+# Default smoke verifies USER + bash on PATH. Override per-repo via
+# build_args: RUNTIME_SMOKE_CMD=<command> (constraint: CLI-only, no
+# GUI binaries that init Qt / OGRE on --version / --help).
+#
+# `sh -c` wrapper required: bare `RUN ${ARG}` word-splits operators
+# (&&, ||) and nested quotes. The wrapper passes the value as a
+# single string for sh to parse normally.
+FROM runtime AS runtime-test
+
+ARG RUNTIME_SMOKE_CMD='whoami && bash --version'
+RUN sh -c "${RUNTIME_SMOKE_CMD}"
