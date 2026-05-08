@@ -1,25 +1,17 @@
 # ros2_distro -- ROS 2 Multi-distro Docker Environment
 
-**[English](README.md)** | **[繁體中文](doc/README.zh-TW.md)** | **[简体中文](doc/README.zh-CN.md)** | **[日本語](doc/README.ja.md)**
+[![CI](https://github.com/ycpss91255-docker/ros2_distro/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/ros2_distro/actions/workflows/main.yaml)
 
-> **TL;DR** — One-command ROS 2 containerized dev environment. Single
-> Dockerfile, single `BASE_IMAGE` ARG: switch between Humble / Jazzy /
-> Iron and `ros:` (custom base, headless) / `osrf/ros:` (desktop /
-> desktop-full) at build time. Default is `osrf/ros:humble-desktop-full-jammy`.
-> Replaces the two legacy repos `ros2_humble` and `osrf_ros2_humble`.
->
-> ```bash
-> ./build.sh && ./run.sh                                                  # default: humble desktop-full
-> ./build.sh --build-arg BASE_IMAGE=osrf/ros:jazzy-desktop-full-noble     # jazzy with GUI
-> ./build.sh --build-arg BASE_IMAGE=ros:humble-ros-base-jammy             # humble headless
-> ```
->
-> See [Build targets](#build-targets) for the full list.
+One-command ROS 2 containerized dev environment. Single Dockerfile, single `BASE_IMAGE` ARG to switch between Humble / Jazzy / Iron and `ros:` (headless) / `osrf/ros:` (desktop / desktop-full) at build time.
+
+**[English](README.md)** | **[繁體中文](doc/README.zh-TW.md)** | **[简体中文](doc/README.zh-CN.md)** | **[日本語](doc/README.ja.md)**
 
 ---
 
 ## Table of Contents
 
+- [TL;DR](#tldr)
+- [Overview](#overview)
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Build targets](#build-targets)
@@ -32,6 +24,30 @@
 - [Updating docker\_template](#updating-template)
 
 ---
+
+## TL;DR
+
+```bash
+./build.sh && ./run.sh                                                  # default: humble desktop-full
+./build.sh --build-arg BASE_IMAGE=osrf/ros:jazzy-desktop-full-noble     # jazzy with GUI
+./build.sh --build-arg BASE_IMAGE=ros:humble-ros-base-jammy             # humble headless
+```
+
+See [Build targets](#build-targets) for the full list.
+
+## Overview
+
+`ros2_distro` consolidates the two legacy single-distro repos
+(`ros2_humble`, `osrf_ros2_humble`) into one Dockerfile parameterized
+by `BASE_IMAGE`, and extends coverage to Jazzy (Ubuntu 24.04 noble)
+and Iron. The legacy repos shared 90% of their Dockerfile and diverged
+only on the `FROM` line, so collapsing them removes a long-standing
+maintenance burden: a single fix in `sys` / `base` / `devel` now
+reaches every ROS 2 distro and registry combination at once. Default
+is `osrf/ros:humble-desktop-full-jammy`; CI exercises a 4-entry matrix
+(humble / jazzy, `ros:` / `osrf/ros:`) on every push, including
+noble's deb822 apt sources and the `gazebo` (humble classic) vs `gz`
+(jazzy Harmonic) divergence.
 
 ## Features
 
@@ -372,33 +388,30 @@ See [TEST.md](doc/test/TEST.md) for details.
 ## Directory Structure
 
 ```text
-osrf_ros2_humble/
-├── compose.yaml                 # Docker Compose definition
-├── Dockerfile                   # Multi-stage build
-├── build.sh                     # Build script (runs from any directory)
-├── run.sh                       # Run script (runs from any directory)
-├── exec.sh                      # Enter running container
-├── stop.sh                      # Stop running container
-├── .env.example                 # Environment variable template
-├── .hadolint.yaml               # Hadolint ignore rules
+ros2_distro/
+├── compose.yaml                              # Docker Compose definition
+├── Dockerfile                                # Multi-stage build
+├── build.sh -> template/script/docker/build.sh   # Symlink
+├── run.sh -> template/script/docker/run.sh       # Symlink
+├── exec.sh -> template/script/docker/exec.sh     # Symlink
+├── stop.sh -> template/script/docker/stop.sh     # Symlink
+├── Makefile -> template/script/docker/Makefile   # Symlink
+├── .env.example                              # IMAGE_NAME fallback
+├── .hadolint.yaml                            # Hadolint ignore rules
+├── setup.conf                                # Repo override (selects BASE_IMAGE etc.)
 ├── script/
-│   └── entrypoint.sh            # Container entrypoint
-├── doc/                         # Translated READMEs
+│   └── entrypoint.sh                         # Container entrypoint
+├── doc/                                      # Translated READMEs + TEST + CHANGELOG
 │   ├── README.zh-TW.md
 │   ├── README.zh-CN.md
-│   └── README.ja.md
-├── .github/workflows/           # CI/CD
-│   ├── main.yaml                # Main pipeline
-│   ├── build-worker.yaml        # Docker build + smoke test
-│   └── release-worker.yaml      # GitHub Release
-├── test/smoke/             # Bats environment tests
-│   ├── ros_env.bats
-│   ├── script_help.bats
-│   └── test_helper.bash
-└── template/         # git subtree (v1.4.0)
-    └── src/
-        ├── setup.sh             # System detection + .env generation
-        └── config/              # shell/pip/terminator/tmux config
+│   ├── README.ja.md
+│   ├── test/TEST.md
+│   └── changelog/CHANGELOG.md
+├── test/smoke/                               # Repo-specific Bats environment tests
+│   └── ros_env.bats
+├── .github/workflows/
+│   └── main.yaml                             # CI (calls template reusable workflows)
+└── template/                                 # git subtree (version pinned in template/.version)
 ```
 
 ## Updating template
