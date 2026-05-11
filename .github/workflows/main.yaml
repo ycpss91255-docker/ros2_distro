@@ -77,7 +77,7 @@ jobs:
           - { name: 'jazzy-desktop-full',  base: 'osrf/ros:jazzy-desktop-full-noble',  is_latest: false }
           - { name: 'jazzy-ros-base',      base: 'ros:jazzy-ros-base-noble',           is_latest: false }
     name: publish (${{ matrix.target.name }})
-    uses: ycpss91255-docker/template/.github/workflows/publish-worker.yaml@v0.20.0
+    uses: ycpss91255-docker/base/.github/workflows/publish-worker.yaml@v0.20.0
     with:
       image_name: ros2_distro
       tag_suffix: "-${{ matrix.target.name }}"
