@@ -195,7 +195,7 @@ COPY --from=test-tools-stage /usr/local/bin/hadolint /usr/local/bin/hadolint
 COPY .hadolint.yaml /lint/.hadolint.yaml
 COPY Dockerfile /lint/Dockerfile
 COPY *.sh /lint/
-COPY template/script/docker/_lib.sh \
+COPY .base/script/docker/_lib.sh \
      template/script/docker/i18n.sh \
      template/script/docker/_tui_conf.sh \
      /lint/
@@ -210,7 +210,7 @@ RUN ln -sf /opt/bats/bin/bats /usr/local/bin/bats
 ENV BATS_LIB_PATH="/usr/lib/bats"
 
 # Smoke test (shared tests from template + repo-specific tests)
-COPY template/test/smoke/ /smoke_test/
+COPY .base/test/smoke/ /smoke_test/
 COPY test/smoke/ /smoke_test/
 
 ARG USER

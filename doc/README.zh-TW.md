@@ -41,7 +41,7 @@
 - **Smoke Test**：build 時自動跑 Bats 測試驗證環境正確性
 - **Docker Compose**：一個 `compose.yaml` 管理所有 target
 - **自動偵測**：`setup.sh` 自動偵測 UID/GID/workspace，產生 `.env`
-- **模組化設定**：shell config 透過 [template](https://github.com/ycpss91255-docker/template) subtree 管理
+- **模組化設定**：shell config 透過 [template](https://github.com/ycpss91255-docker/base) subtree 管理
 - **X11 轉發**：支援 GUI 應用程式（RViz2、Terminator 等）
 
 > **注意**：此映像使用 `osrf/ros`，僅支援 **x86_64**。如需 ARM/Raspberry Pi 支援，請使用 [ros2_humble](https://github.com/ycpss91255-docker/ros2_humble)。
@@ -126,7 +126,7 @@ my_robot_project/
 │   ├── run.sh
 │   ├── compose.yaml
 │   ├── Dockerfile
-│   └── template/
+│   └── .base/
 └── ...
 ```
 
@@ -163,7 +163,7 @@ git subtree pull --prefix=docker/osrf_ros2_humble \
 > **注意事項**：
 > - 本地微調由 git 正常追蹤。
 > - 若上游改了你也修改過的檔案，`subtree pull` 會產生 merge conflict，需手動解決。
-> - **不要**直接修改 subtree 內的 `template/` — 那是 env repo 自己的 subtree。
+> - **不要**直接修改 subtree 內的 `.base/` — 那是 env repo 自己的 subtree。
 
 ## 設定
 
@@ -308,7 +308,7 @@ osrf_ros2_humble/
 │   ├── ros_env.bats
 │   ├── script_help.bats
 │   └── test_helper.bash
-└── template/         # git subtree (v1.4.0)
+└── .base/         # git subtree (v1.4.0)
     └── src/
         ├── setup.sh             # 系統偵測 + .env 產生
         └── config/              # shell/pip/terminator/tmux 設定
@@ -318,5 +318,5 @@ osrf_ros2_humble/
 
 ```bash
 git subtree pull --prefix=template \
-    https://github.com/ycpss91255-docker/template.git v1.4.0 --squash
+    https://github.com/ycpss91255-docker/base.git v1.4.0 --squash
 ```
