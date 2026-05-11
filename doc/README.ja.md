@@ -42,7 +42,7 @@
 - **Smoke Test**：ビルド時に自動で Bats テストを実行し環境の正確性を検証
 - **Docker Compose**：`compose.yaml` 1つで全 target を管理
 - **自動検出**：`setup.sh` が UID/GID/workspace を自動検出し `.env` を生成
-- **モジュール化設定**：shell config は [template](https://github.com/ycpss91255-docker/template) subtree で管理
+- **モジュール化設定**：shell config は [template](https://github.com/ycpss91255-docker/base) subtree で管理
 - **X11 転送**：GUI アプリケーション対応（RViz2、Terminator 等）
 
 > **注意**：このイメージは `osrf/ros` を使用しており、**x86_64** のみ対応。ARM/Raspberry Pi が必要な場合は [ros2_humble](https://github.com/ycpss91255-docker/ros2_humble) を使用してください。
@@ -127,7 +127,7 @@ my_robot_project/
 │   ├── run.sh
 │   ├── compose.yaml
 │   ├── Dockerfile
-│   └── template/
+│   └── .base/
 └── ...
 ```
 
@@ -164,7 +164,7 @@ git subtree pull --prefix=docker/osrf_ros2_humble \
 > **注意事項**：
 > - ローカルの変更は git で通常通り追跡されます。
 > - 上流があなたが変更したファイルも変更した場合、`subtree pull` で merge conflict が発生する可能性があり、手動で解決が必要です。
-> - subtree 内の `template/` は**直接変更しないでください** — env リポジトリ自身の subtree として管理されています。
+> - subtree 内の `.base/` は**直接変更しないでください** — env リポジトリ自身の subtree として管理されています。
 
 ## 設定
 
@@ -309,7 +309,7 @@ osrf_ros2_humble/
 │   ├── ros_env.bats
 │   ├── script_help.bats
 │   └── test_helper.bash
-└── template/         # git subtree (v1.4.0)
+└── .base/         # git subtree (v1.4.0)
     └── src/
         ├── setup.sh             # システム検出 + .env 生成
         └── config/              # shell/pip/terminator/tmux 設定
@@ -319,5 +319,5 @@ osrf_ros2_humble/
 
 ```bash
 git subtree pull --prefix=template \
-    https://github.com/ycpss91255-docker/template.git v1.4.0 --squash
+    https://github.com/ycpss91255-docker/base.git v1.4.0 --squash
 ```

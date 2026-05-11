@@ -146,7 +146,7 @@ ARG USER
 ARG GROUP
 ARG ENTRYPOINT_FILE="script/entrypoint.sh"
 ARG CONFIG_DIR="/tmp/config"
-# <repo>/config is a per-repo copy of template/config seeded by init.sh.
+# <repo>/config is a per-repo copy of .base/config seeded by init.sh.
 # Edit files there freely; template upgrades do not touch this directory.
 ARG CONFIG_SRC="config"
 
@@ -195,9 +195,9 @@ COPY --from=test-tools-stage /usr/local/bin/hadolint /usr/local/bin/hadolint
 COPY .hadolint.yaml /lint/.hadolint.yaml
 COPY Dockerfile /lint/Dockerfile
 COPY *.sh /lint/
-COPY template/script/docker/_lib.sh \
-     template/script/docker/i18n.sh \
-     template/script/docker/_tui_conf.sh \
+COPY .base/script/docker/_lib.sh \
+     .base/script/docker/i18n.sh \
+     .base/script/docker/_tui_conf.sh \
      /lint/
 RUN shellcheck -S warning /lint/*.sh
 RUN cd /lint && hadolint Dockerfile
@@ -210,7 +210,7 @@ RUN ln -sf /opt/bats/bin/bats /usr/local/bin/bats
 ENV BATS_LIB_PATH="/usr/lib/bats"
 
 # Smoke test (shared tests from template + repo-specific tests)
-COPY template/test/smoke/ /smoke_test/
+COPY .base/test/smoke/ /smoke_test/
 COPY test/smoke/ /smoke_test/
 
 ARG USER

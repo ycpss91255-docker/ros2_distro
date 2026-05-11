@@ -26,7 +26,7 @@ jobs:
           - { name: 'jazzy-desktop-full',  base: 'osrf/ros:jazzy-desktop-full-noble' }
           - { name: 'jazzy-ros-base',      base: 'ros:jazzy-ros-base-noble' }
     name: build (${{ matrix.target.name }})
-    uses: ycpss91255-docker/template/.github/workflows/build-worker.yaml@v0.24.0
+    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.25.0
     with:
       image_name: ros2_distro
       build_args: |
@@ -77,7 +77,7 @@ jobs:
           - { name: 'jazzy-desktop-full',  base: 'osrf/ros:jazzy-desktop-full-noble',  is_latest: false }
           - { name: 'jazzy-ros-base',      base: 'ros:jazzy-ros-base-noble',           is_latest: false }
     name: publish (${{ matrix.target.name }})
-    uses: ycpss91255-docker/template/.github/workflows/publish-worker.yaml@v0.20.0
+    uses: ycpss91255-docker/base/.github/workflows/publish-worker.yaml@v0.20.0
     with:
       image_name: ros2_distro
       tag_suffix: "-${{ matrix.target.name }}"
@@ -91,7 +91,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
-    uses: ycpss91255-docker/template/.github/workflows/release-worker.yaml@v0.24.0
+    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.25.0
     with:
       archive_name_prefix: ros2_distro
     secrets: inherit
