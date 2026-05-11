@@ -31,7 +31,7 @@ jobs:
       image_name: ros2_distro
       build_args: |
         BASE_IMAGE=${{ matrix.target.base }}
-        RUNTIME_SMOKE_CMD=. /opt/ros/${ROS_DISTRO}/setup.bash && ros2 -h
+        RUNTIME_SMOKE_CMD=bash -c '. /opt/ros/${ROS_DISTRO}/setup.bash && ros2 -h'
 
   # Stable-named aggregator so branch protection's required-status-check
   # doesn't have to enumerate every matrix entry. Branch protection
@@ -86,7 +86,7 @@ jobs:
       target: devel
       build_args: |
         BASE_IMAGE=${{ matrix.target.base }}
-        RUNTIME_SMOKE_CMD=. /opt/ros/${ROS_DISTRO}/setup.bash && ros2 -h
+        RUNTIME_SMOKE_CMD=bash -c '. /opt/ros/${ROS_DISTRO}/setup.bash && ros2 -h'
 
   call-release:
     needs: call-docker-build
