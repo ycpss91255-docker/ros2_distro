@@ -199,7 +199,8 @@ COPY .base/script/docker/_lib.sh \
      .base/script/docker/i18n.sh \
      .base/script/docker/_tui_conf.sh \
      /lint/
-RUN shellcheck -S warning /lint/*.sh
+COPY .base/script/docker/lib /lint/lib
+RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh
 RUN cd /lint && hadolint Dockerfile
 
 # Bats (from pre-built test-tools image; see TEST_TOOLS_IMAGE at top)
