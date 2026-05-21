@@ -379,3 +379,178 @@ CONF
   # File should be unchanged (still empty).
   [[ ! -s "${_gitignore}" ]]
 }
+
+# ════════════════════════════════════════════════════════════════════
+# _sync_logging_local_paths_gitignore prune behavior (#390)
+# ════════════════════════════════════════════════════════════════════
+#
+# When local_path values change (e.g. a rename), stale entries inside
+# the managed block must be removed so downstream .gitignore stays
+# consistent without manual intervention. Entries outside the managed
+# block are user-owned and must never be touched.
+
+@test "_sync_logging_local_paths_gitignore prunes stale managed entries on value change (#390)" {
+  local _gitignore="${TEMP_DIR}/.gitignore"
+  : > "${_gitignore}"
+  _sync_logging_local_paths_gitignore "${TEMP_DIR}" "local_path=./logs/" ""
+  run grep -xF "/logs/" "${_gitignore}"
+  assert_success
+  # Second apply with renamed value: /logs/ pruned, /log/ added.
+  _sync_logging_local_paths_gitignore "${TEMP_DIR}" "local_path=./log/" ""
+  run grep -xF "/logs/" "${_gitignore}"
+  assert_failure
+  run grep -xF "/log/" "${_gitignore}"
+  assert_success
+}
+
+@test "_sync_logging_local_paths_gitignore drops marker + entries when candidates become empty (#390)" {
+  local _gitignore="${TEMP_DIR}/.gitignore"
+  : > "${_gitignore}"
+  _sync_logging_local_paths_gitignore "${TEMP_DIR}" "local_path=./logs/" ""
+  run grep -xF "/logs/" "${_gitignore}"
+  assert_success
+  # Feature turned off: marker + entries removed.
+  _sync_logging_local_paths_gitignore "${TEMP_DIR}" "" ""
+  run grep -xF "/logs/" "${_gitignore}"
+  assert_failure
+  run grep -xF "# managed by template: [logging] local_path (do not remove)" "${_gitignore}"
+  assert_failure
+}
+
+@test "_sync_logging_local_paths_gitignore preserves user entries outside managed block (#390)" {
+  local _gitignore="${TEMP_DIR}/.gitignore"
+  # User-owned /logs/ above the managed block (e.g. legacy entry kept
+  # for the host directory after the rename migration).
+  printf '%s\n' "# user ignores" "/logs/" "" > "${_gitignore}"
+  _sync_logging_local_paths_gitignore "${TEMP_DIR}" "local_path=./log/" ""
+  run grep -xF "/logs/" "${_gitignore}"
+  assert_success
+  run grep -xF "/log/" "${_gitignore}"
+  assert_success
+  # Turning the feature off prunes managed /log/ but leaves user /logs/.
+  _sync_logging_local_paths_gitignore "${TEMP_DIR}" "" ""
+  run grep -xF "/logs/" "${_gitignore}"
+  assert_success
+  run grep -xF "/log/" "${_gitignore}"
+  assert_failure
+}
+
+# ════════════════════════════════════════════════════════════════════
+# setup.conf [logging] section: in-image helper path reference (#368)
+# ════════════════════════════════════════════════════════════════════
+
+@test "setup.conf [logging] comment block references in-image helper path (/usr/local/lib/base/, #368)" {
+  # The [logging] section in the template default setup.conf is the
+  # primary surface where downstream maintainers learn about the
+  # local_path feature + the entrypoint helper. PR #356 originally
+  # pointed at `.base/script/docker/_entrypoint_logging.sh` (the
+  # subtree path inside the workspace bind mount), which crashes on
+  # build-time smoke ($USER unset) and is wrong on multi-repo
+  # workspaces (WS_PATH = workspace parent, not repo root). Path A
+  # ships the helper into the image at /usr/local/lib/base/; the
+  # comment must point there so the documented adoption path matches
+  # the COPY in Dockerfile.example.
+  local _conf="/source/config/docker/setup.conf"
+  [[ -f "${_conf}" ]] || skip "config/docker/setup.conf not present"
+  run grep -F '/usr/local/lib/base/_entrypoint_logging.sh' "${_conf}"
+  assert_success
+  # Negative guard: the broken pre-#368 path must not reappear.
+  run grep -F '.base/script/docker/_entrypoint_logging.sh' "${_conf}"
+  assert_failure
+}
+
+# ════════════════════════════════════════════════════════════════════
+# generate_compose_yaml: per-stage LOG_FILE_PATH on extends:devel
+# stages (#367)
+# ════════════════════════════════════════════════════════════════════
+
+@test "generate_compose_yaml emits per-stage LOG_FILE_PATH on extends:devel stage when [logging] local_path is set (#367)" {
+  # Without this fix, the zero-diff `extends: service: devel` branch
+  # (the minimal-shape emit for stages with no [stage:<name>] override,
+  # #215) only emits build / image / container_name / profiles. The
+  # extends merge then inherits devel's LOG_FILE_PATH=devel.log into
+  # every extending service, so `./run.sh -d runtime` ends up tee'ing
+  # the runtime container's stdout to logs/devel.log -- breaking the
+  # "one file per service" guarantee the original PR #356 framing
+  # promised. Fix is Option A: emit per-service LOG_FILE_PATH +
+  # volume mount uniformly on every service block; compose's extends
+  # merge concatenates environment arrays and last-wins resolution at
+  # runtime picks the override.
+  cat > "${TEMP_DIR}/Dockerfile" <<'EOF'
+FROM ubuntu:24.04 AS sys
+FROM sys AS devel
+FROM devel AS runtime
+EOF
+  local _extras=()
+  local _global
+  printf -v _global '%s\n%s' "driver=json-file" "local_path=./logs/"
+  generate_compose_yaml "${COMPOSE_OUT}" "myrepo" \
+    "false" "false" "0" "gpu" _extras "" "" "" "" "" "" "host" "host" \
+    "" "" "" "" "" "" "" "" "" "${_global}" ""
+  # The runtime block must carry its OWN LOG_FILE_PATH override line
+  # alongside the inherited devel.log; runtime.log filename is unique
+  # to the runtime service so a single grep proves the override emit.
+  run grep -F 'LOG_FILE_PATH=/var/log/myrepo/runtime.log' "${COMPOSE_OUT}"
+  assert_success
+}
+
+@test "generate_compose_yaml emits per-stage volume mount on extends:devel stage when [logging] local_path is set (#367)" {
+  # The host bind mount `<resolved>:/var/log/<repo>` must appear in
+  # the runtime block too so the per-service LOG_FILE_PATH path is
+  # writable from inside the extending container. compose's extends
+  # merge already inherits devel's mount string, but emitting it on
+  # the child block as well is harmless (compose dedups identical
+  # mount strings) and keeps the emit logic uniform across all
+  # services.
+  cat > "${TEMP_DIR}/Dockerfile" <<'EOF'
+FROM ubuntu:24.04 AS sys
+FROM sys AS devel
+FROM devel AS runtime
+EOF
+  local _extras=()
+  local _global
+  printf -v _global '%s\n%s' "driver=json-file" "local_path=./logs/"
+  generate_compose_yaml "${COMPOSE_OUT}" "myrepo" \
+    "false" "false" "0" "gpu" _extras "" "" "" "" "" "" "host" "host" \
+    "" "" "" "" "" "" "" "" "" "${_global}" ""
+  # The bind mount string ends with `:/var/log/myrepo`. Expect at
+  # least 3 emits in compose.yaml: devel + test + runtime (the
+  # runtime emit is the regression guard -- pre-#367 only devel +
+  # test had it). The exact host-path prefix depends on _setup_base
+  # resolution of `./logs/` so anchor on the in-container target.
+  local _occurrences
+  _occurrences="$(grep -cF ':/var/log/myrepo' "${COMPOSE_OUT}" || true)"
+  (( _occurrences >= 3 )) || {
+    echo "expected >=3 :/var/log/myrepo mount strings, found ${_occurrences}"
+    echo "--- compose.yaml emitted ---"
+    cat "${COMPOSE_OUT}"
+    echo "--- /dump ---"
+    return 1
+  }
+}
+
+@test "generate_compose_yaml does NOT emit LOG_FILE_PATH on extends:devel stage when [logging] local_path is unset (#367 back-compat)" {
+  # Back-compat: stages with no overrides AND no local_path stay on
+  # the byte-for-byte pre-#220 minimal-shape emit. Specifically the
+  # runtime block must NOT acquire an environment / volumes line --
+  # the original v0.30.0 zero-diff promise must hold.
+  cat > "${TEMP_DIR}/Dockerfile" <<'EOF'
+FROM ubuntu:24.04 AS sys
+FROM sys AS devel
+FROM devel AS runtime
+EOF
+  local _extras=()
+  # No [logging] global_str at all; local_path unset entirely.
+  generate_compose_yaml "${COMPOSE_OUT}" "myrepo" \
+    "false" "false" "0" "gpu" _extras "" "" "" "" "" "" "host" "host" \
+    "" "" "" "" "" "" "" "" "" "" ""
+  # Slice the runtime block: from `^  runtime:$` to the next top-level
+  # service header (`^  [a-z][a-z0-9_-]*:$`) and assert neither
+  # environment: nor volumes: appears inside it.
+  run awk '/^  runtime:$/{flag=1; next} /^  [a-z]/{flag=0} flag' \
+    "${COMPOSE_OUT}"
+  assert_success
+  refute_output --partial 'LOG_FILE_PATH'
+  refute_output --regexp '^    volumes:$'
+  refute_output --regexp '^    environment:$'
+}
