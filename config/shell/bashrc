@@ -10,9 +10,9 @@ alias_func() {
 
 swc() {
   local -ar setup_path=(
-    "./devel"
-    "../devel"
-    "${HOME}/work/devel"
+    "./install"
+    "../install"
+    "${HOME}/work/install"
     )
   local -r setup_file="setup.bash"
 

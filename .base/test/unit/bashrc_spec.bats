@@ -86,3 +86,51 @@ setup() {
   assert [ -d "/source/config/shell/bashrc.d" ]
   assert [ -f "/source/config/shell/bashrc.d/.gitkeep" ]
 }
+
+# ════════════════════════════════════════════════════════════════════
+# swc — colcon workspace source helper (fix #28)
+# ════════════════════════════════════════════════════════════════════
+
+@test "swc is defined" {
+  run grep -q "^swc()" "${RC}"
+  assert_success
+}
+
+@test "swc searches colcon install/ paths, not catkin devel/" {
+  run grep -qE '"[.][.]/install"' "${RC}"
+  assert_success
+  run grep -qE '"[.]/devel"|"[.][.]/devel"' "${RC}"
+  assert_failure
+}
+
+@test "swc sources ./install/setup.bash when present" {
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  mkdir -p "${tmpdir}/install"
+  printf '# stub workspace setup\n' > "${tmpdir}/install/setup.bash"
+  run bash -c "source '${RC}' >/dev/null 2>&1; cd '${tmpdir}'; swc"
+  assert_success
+  assert_output --partial "sourced ./install/setup.bash"
+  rm -rf "${tmpdir}"
+}
+
+@test "swc sources ../install/setup.bash when ./install absent" {
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  local subdir="${tmpdir}/sub"
+  mkdir -p "${subdir}" "${tmpdir}/install"
+  printf '# stub workspace setup\n' > "${tmpdir}/install/setup.bash"
+  run bash -c "source '${RC}' >/dev/null 2>&1; cd '${subdir}'; swc"
+  assert_success
+  assert_output --partial "sourced ../install/setup.bash"
+  rm -rf "${tmpdir}"
+}
+
+@test "swc exits 1 and reports missing candidates when no setup.bash found" {
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  run bash -c "source '${RC}' >/dev/null 2>&1; cd '${tmpdir}'; HOME='${tmpdir}' swc 2>&1"
+  assert_failure
+  assert_output --partial "No setup.bash found"
+  rm -rf "${tmpdir}"
+}
