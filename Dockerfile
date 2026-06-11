@@ -33,6 +33,7 @@ ARG BASE_IMAGE="osrf/ros:humble-desktop-full-jammy"
 ARG TEST_TOOLS_IMAGE="test-tools:local"
 
 ############################## sys ##############################
+# hadolint ignore=DL3006
 FROM ${BASE_IMAGE} AS sys
 
 ARG USER="initial"
@@ -74,7 +75,7 @@ RUN if getent group "${GID}" >/dev/null; then \
     elif id -u "${USER}" >/dev/null 2>&1; then \
         usermod -u "${UID}" -g "${GID}" -s "${SHELL}" -d "/home/${USER}" -m "${USER}"; \
     else \
-        useradd -u "${UID}" -g "${GID}" -s "${SHELL}" -m "${USER}"; \
+        useradd -l -u "${UID}" -g "${GID}" -s "${SHELL}" -m "${USER}"; \
     fi; \
     \
     mkdir -p /etc/sudoers.d; \
@@ -181,6 +182,7 @@ CMD ["bash"]
 
 ############################## devel-test (ephemeral) ##############################
 # Resolves to test-tools:local (local build.sh) or ghcr.io/.../test-tools:vX.Y.Z (CI).
+# hadolint ignore=DL3006
 FROM ${TEST_TOOLS_IMAGE} AS test-tools-stage
 
 FROM devel AS devel-test
@@ -201,7 +203,8 @@ COPY .base/script/docker/_lib.sh \
      /lint/
 COPY .base/script/docker/lib /lint/lib
 RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh
-RUN cd /lint && hadolint Dockerfile
+WORKDIR /lint
+RUN hadolint Dockerfile
 
 # Bats (from pre-built test-tools image; see TEST_TOOLS_IMAGE at top)
 COPY --from=test-tools-stage /opt/bats /opt/bats
