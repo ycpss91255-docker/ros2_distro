@@ -197,10 +197,6 @@ COPY --from=test-tools-stage /usr/local/bin/hadolint /usr/local/bin/hadolint
 COPY .hadolint.yaml /lint/.hadolint.yaml
 COPY Dockerfile /lint/Dockerfile
 COPY script/*.sh /lint/
-COPY .base/script/docker/_lib.sh \
-     .base/script/docker/i18n.sh \
-     .base/script/docker/_tui_conf.sh \
-     /lint/
 COPY .base/script/docker/lib /lint/lib
 RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh
 WORKDIR /lint
