@@ -267,13 +267,23 @@ ARG USER
 
 # Baseline ROS 2 runtime libs. Downstream can drop these if their `build`
 # stage already pulls in the right deps via rosdep + COPY.
+#
+# Also append a ROS source to /etc/bash.bashrc so interactive `docker exec`
+# shells get `ros2` on PATH: the entrypoint sources ROS for PID 1 only and
+# `docker exec` bypasses the entrypoint (devel sources it via config/shell/bashrc,
+# runtime is minimal and otherwise would not). /etc/bash.bashrc is read by
+# interactive shells only, so non-interactive correctness is untouched and --
+# unlike baking ROS into ENV -- it is not arch-/python-version fragile. Folded
+# into this RUN (not a separate one) to avoid a consecutive-RUN lint (DL3059).
+# See realsense_ros2#88 / base#657.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         "ros-${ROS_DISTRO}-rclpy" \
         "ros-${ROS_DISTRO}-rclcpp" \
         && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    printf 'source /opt/ros/%s/setup.bash\n' "${ROS_DISTRO}" >> /etc/bash.bashrc
 
 # Pull in the install tree produced by the `build` stage. Empty in upstream
 # (build is a no-op); downstream's overridden `build` populates this with
